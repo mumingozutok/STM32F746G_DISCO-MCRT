@@ -48,6 +48,12 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_uart_ex.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_hcd.h \
  ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h \
+ ../FATFS/App/fatfs.h ../Middlewares/Third_Party/FatFs/src/ff.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h ../FATFS/Target/ffconf.h \
+ ../FATFS/Target/bsp_driver_sd.h ../FATFS/Target/fatfs_platform.h \
+ ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/sd_diskio.h \
  ../lib/MCRuntime_V1.h ../Adaptors/adaptor.h \
  ../Drivers/BSP/STM32746G-Discovery/stm32746g_discovery_lcd.h \
  ../Drivers/BSP/STM32746G-Discovery/../Components/rk043fn48h/rk043fn48h.h \
@@ -154,6 +160,26 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_hal_hcd.h:
 
 ../Drivers/STM32F7xx_HAL_Driver/Inc/stm32f7xx_ll_usb.h:
+
+../FATFS/App/fatfs.h:
+
+../Middlewares/Third_Party/FatFs/src/ff.h:
+
+../Middlewares/Third_Party/FatFs/src/integer.h:
+
+../FATFS/Target/ffconf.h:
+
+../FATFS/Target/bsp_driver_sd.h:
+
+../FATFS/Target/fatfs_platform.h:
+
+../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h:
+
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+
+../Middlewares/Third_Party/FatFs/src/ff.h:
+
+../FATFS/Target/sd_diskio.h:
 
 ../lib/MCRuntime_V1.h:
 

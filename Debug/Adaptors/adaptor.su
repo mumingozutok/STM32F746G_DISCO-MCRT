@@ -25,4 +25,6 @@ adaptor.c:363:7:Display_Number	40	static
 adaptor.c:384:6:init_lcd_display	8	static
 adaptor.c:392:6:Display_Clear	8	static
 adaptor.c:400:6:hal_xfer_watch_data	16	static
-adaptor.c:404:6:initiate_runtime	8	static
+adaptor.c:405:6:hal_disable_interrupts	4	static,ignoring_inline_asm
+adaptor.c:409:6:hal_enable_interrupts	4	static,ignoring_inline_asm
+adaptor.c:413:6:initiate_runtime	8	static
