@@ -401,6 +401,15 @@ void hal_xfer_watch_data(uint8_t len, uint8_t* watch_data){
 	hal_modbus_uart_tx(watch_data, len);
 }
 
+//interrupt management
+void hal_disable_interrupts(){
+	__disable_irq();
+}
+
+void hal_enable_interrupts(){
+	__enable_irq();
+}
+
 void initiate_runtime()
 {
 	  init_comm_data_service();
