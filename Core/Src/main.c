@@ -117,16 +117,7 @@ static void MX_SDMMC1_SD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define 	LCD_FOREGROUND_LAYER   0x0001
-#define 	LCD_BACKGROUND_LAYER   0x0000
-#define 	LCD_FRAME_BUFFER   ((uint32_t)0xC0000000)
 
-void init_lcd_display(){
-	  BSP_LCD_Init();
-	  BSP_LCD_LayerRgb565Init( LTDC_ACTIVE_LAYER, LCD_FRAME_BUFFER);
-	  BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER);
-	  BSP_LCD_DisplayOn();
-}
 /* USER CODE END 0 */
 
 /**
@@ -145,7 +136,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  init_lcd_display();
+  BSP_LCD_Init();
   /* USER CODE END Init */
 
   /* Configure the system clock */

@@ -50,34 +50,34 @@ $(wildcard ../makefile.init) \
 $(wildcard ../makefile.targets) \
 
 
-BUILD_ARTIFACT_NAME := STM32F746_MCRuntimeTest
+BUILD_ARTIFACT_NAME := STM32F746G-DISCO-MCRT
 BUILD_ARTIFACT_EXTENSION := elf
 BUILD_ARTIFACT_PREFIX :=
 BUILD_ARTIFACT := $(BUILD_ARTIFACT_PREFIX)$(BUILD_ARTIFACT_NAME)$(if $(BUILD_ARTIFACT_EXTENSION),.$(BUILD_ARTIFACT_EXTENSION),)
 
 # Add inputs and outputs from these tool invocations to the build variables 
 EXECUTABLES += \
-STM32F746_MCRuntimeTest.elf \
+STM32F746G-DISCO-MCRT.elf \
 
 SIZE_OUTPUT += \
 default.size.stdout \
 
 OBJDUMP_LIST += \
-STM32F746_MCRuntimeTest.list \
+STM32F746G-DISCO-MCRT.list \
 
 OBJCOPY_BIN += \
-STM32F746_MCRuntimeTest.bin \
+STM32F746G-DISCO-MCRT.bin \
 
 
 # All Target
 all: main-build
 
 # Main-build Target
-main-build: STM32F746_MCRuntimeTest.elf secondary-outputs
+main-build: STM32F746G-DISCO-MCRT.elf secondary-outputs
 
 # Tool invocations
-STM32F746_MCRuntimeTest.elf: $(OBJS) $(USER_OBJS) D:\work\techsafe\MCRuntime\Sinan\workspace_05012022\STM32F746_MCRuntimeTest\STM32F746NGHX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "STM32F746_MCRuntimeTest.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"D:\work\techsafe\MCRuntime\Sinan\workspace_05012022\STM32F746_MCRuntimeTest\STM32F746NGHX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32F746_MCRuntimeTest.map" -Wl,--gc-sections -static -L"D:\work\techsafe\MCRuntime\Sinan\workspace_05012022\MCRuntime_V1\Debug_STM32_M7" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+STM32F746G-DISCO-MCRT.elf: $(OBJS) $(USER_OBJS) D:\work\techsafe\MCRuntime\stm32-works\code\boards\STM32F746G-DISCO-MCRT\STM32F746NGHX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "STM32F746G-DISCO-MCRT.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m7 -T"D:\work\techsafe\MCRuntime\stm32-works\code\boards\STM32F746G-DISCO-MCRT\STM32F746NGHX_FLASH.ld" --specs=nosys.specs -Wl,-Map="STM32F746G-DISCO-MCRT.map" -Wl,--gc-sections -static -L"D:\work\techsafe\MCRuntime\stm32-works\code\mcrt\Debug_STM32_M7" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
@@ -86,19 +86,19 @@ default.size.stdout: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
 	@echo 'Finished building: $@'
 	@echo ' '
 
-STM32F746_MCRuntimeTest.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "STM32F746_MCRuntimeTest.list"
+STM32F746G-DISCO-MCRT.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objdump -h -S $(EXECUTABLES) > "STM32F746G-DISCO-MCRT.list"
 	@echo 'Finished building: $@'
 	@echo ' '
 
-STM32F746_MCRuntimeTest.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "STM32F746_MCRuntimeTest.bin"
+STM32F746G-DISCO-MCRT.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "STM32F746G-DISCO-MCRT.bin"
 	@echo 'Finished building: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) STM32F746_MCRuntimeTest.bin STM32F746_MCRuntimeTest.elf STM32F746_MCRuntimeTest.list default.size.stdout
+	-$(RM) STM32F746G-DISCO-MCRT.bin STM32F746G-DISCO-MCRT.elf STM32F746G-DISCO-MCRT.list default.size.stdout
 	-@echo ' '
 
 secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_BIN)

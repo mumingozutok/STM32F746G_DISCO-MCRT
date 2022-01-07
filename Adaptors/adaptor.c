@@ -223,12 +223,19 @@ void get_uniqueid(uint8_t* id, uint16_t len){
 
 #ifdef STM32F467_FLASH_OK
 
-#define ADDR_FLASH_SECTOR_23     ((uint32_t)0x081E0000)
-#define ADDR_FLASH_SECTOR_22     ((uint32_t)0x081C0000)
-#define ADDR_FLASH_SECTOR_21     ((uint32_t)0x081A0000)
-#define ADDR_FLASH_SECTOR_20     ((uint32_t)0x08180000)
+#define ADDR_FLASH_SECTOR_0 ((uint32_t)0x08000000) // 32 Kbytes
+#define ADDR_FLASH_SECTOR_1 ((uint32_t)0x08008000) // 32 Kbytes
+#define ADDR_FLASH_SECTOR_2 ((uint32_t)0x08010000) // 32 Kbytes
+#define ADDR_FLASH_SECTOR_3 ((uint32_t)0x08018000) // 32 Kbytes
+#define ADDR_FLASH_SECTOR_4 ((uint32_t)0x08020000) // 128 Kbytes
+#define ADDR_FLASH_SECTOR_5 ((uint32_t)0x08040000) // 256 Kbytes
+#define ADDR_FLASH_SECTOR_6 ((uint32_t)0x08080000) // 256 Kbytes
+#define ADDR_FLASH_SECTOR_7 ((uint32_t)0x080C0000) // 256 Kbytes
 
-#define FLASH_MEMORY_SIZE (128*1024)
+#define FLASH_MEMORY_SIZE_32K (32*1024)
+#define FLASH_MEMORY_SIZE_128K (128*1024)
+#define FLASH_MEMORY_SIZE_256K (256*1024)
+
 
 #endif
 
@@ -238,22 +245,22 @@ void get_uniqueid(uint8_t* id, uint16_t len){
 //mem_id: 3 -> Circular FIFO (Data Storage)
 void get_flash_memory_info(uint32_t* start_addr, uint32_t* size, uint8_t mem_id){
 	switch(mem_id){
-	/*case 0:
-		*start_addr = ADDR_FLASH_SECTOR_23;
-		*size = FLASH_MEMORY_SIZE;
+	case 0:
+		*start_addr = ADDR_FLASH_SECTOR_7;
+		*size = FLASH_MEMORY_SIZE_128K;
 		break;
 	case 1:
-		*start_addr = ADDR_FLASH_SECTOR_22;
-		*size = FLASH_MEMORY_SIZE;
+		*start_addr = ADDR_FLASH_SECTOR_6;
+		*size = FLASH_MEMORY_SIZE_256K;
 		break;
 	case 2:
-		*start_addr = ADDR_FLASH_SECTOR_21;
-		*size = FLASH_MEMORY_SIZE;
+		*start_addr = ADDR_FLASH_SECTOR_5;
+		*size = FLASH_MEMORY_SIZE_256K;
 		break;
 	case 3:
-		*start_addr = ADDR_FLASH_SECTOR_20;
-		*size = FLASH_MEMORY_SIZE;
-		break;*/
+		*start_addr = ADDR_FLASH_SECTOR_4;
+		*size = FLASH_MEMORY_SIZE_256K;
+		break;
 	default:
 		*start_addr = 0;
 		*size = 0;
@@ -302,16 +309,16 @@ uint8_t erase_flash(uint32_t start_addr, uint8_t mem_id)
 	EraseInitStruct.NbSectors = 1;
 	switch (mem_id){
 		case 0:
-			EraseInitStruct.Sector = FLASH_SECTOR_8;
+			EraseInitStruct.Sector = FLASH_SECTOR_4;
 			break;
 		case 1:
-			EraseInitStruct.Sector = FLASH_SECTOR_22;
+			EraseInitStruct.Sector = FLASH_SECTOR_5;
 			break;
 		case 2:
-			EraseInitStruct.Sector = FLASH_SECTOR_21;
+			EraseInitStruct.Sector = FLASH_SECTOR_6;
 			break;
 		case 3:
-			EraseInitStruct.Sector = FLASH_SECTOR_20;
+			EraseInitStruct.Sector = FLASH_SECTOR_7;
 			break;
 	}
 
@@ -370,9 +377,21 @@ void  Display_Number(int32_t startX, int32_t startY,
 	BSP_LCD_DisplayStringAt(startX, startY, str, LEFT_MODE);
 }
 
+#define 	LCD_FOREGROUND_LAYER   0x0001
+#define 	LCD_BACKGROUND_LAYER   0x0000
+#define 	LCD_FRAME_BUFFER   ((uint32_t)0xC0000000)
+
+void init_lcd_display(){
+	HAL_Delay(1000);
+	BSP_LCD_LayerRgb565Init( LTDC_ACTIVE_LAYER, LCD_FRAME_BUFFER);
+	BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER);
+	BSP_LCD_Clear(LCD_COLOR_WHITE);
+	BSP_LCD_DisplayOn();
+}
+
 void Display_Clear()
 {
-	  BSP_LCD_Clear(LCD_COLOR_WHITE);
+	BSP_LCD_Clear(LCD_COLOR_WHITE);
 }
 
 
@@ -389,5 +408,6 @@ void initiate_runtime()
 	  initiate_input_channels();
 	  initiate_output_channels();
 	  initate_analog_channels();
+	  init_lcd_display();
 }
 
