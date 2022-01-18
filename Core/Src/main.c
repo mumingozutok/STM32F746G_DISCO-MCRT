@@ -25,6 +25,7 @@
 #include "MCRuntime_V1.h"
 #include "adaptor.h"
 #include "stm32746g_discovery_lcd.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,6 +66,8 @@ SAI_HandleTypeDef hsai_BlockB2;
 SD_HandleTypeDef hsd1;
 
 SPDIFRX_HandleTypeDef hspdif;
+
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
@@ -111,6 +114,7 @@ static void MX_USART6_UART_Init(void);
 static void MX_USB_OTG_FS_HCD_Init(void);
 static void MX_DMA_Init(void);
 static void MX_TIM7_Init(void);
+static void MX_SPI2_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 /* USER CODE BEGIN PFP */
 
@@ -118,6 +122,89 @@ static void MX_SDMMC1_SD_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+
+#ifdef ZAFER
+
+FATFS fs;
+FATFS *pfs;
+FIL fil;
+FRESULT fres;
+DWORD fre_clust;
+uint32_t totalSpace, freeSpace;
+char buffer[100];
+
+/**
+ * @brief  This function is executed in case of error occurrence.
+ * @param  file: The file name as string.
+ * @param  line: The line in file as a number.
+ * @retval None
+ */
+void _Error_Handler(char *file, int line)
+{
+	/* USER CODE BEGIN Error_Handler_Debug */
+	/* User can add his own implementation to report the HAL error return state */
+	while(1)
+	{
+	}
+	/* USER CODE END Error_Handler_Debug */
+}
+
+void sdcard_test(){
+	FRESULT ret;
+
+	/* Wait for SD module reset */
+	HAL_Delay(500);
+
+	/* Mount SD Card */
+	ret = f_mount(&fs, "", 0);
+	if(ret != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	/* Open file to write */
+	ret = f_open(&fil, "first.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+	if(ret != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	/* Check freeSpace space */
+	if(f_getfree("", &fre_clust, &pfs) != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+	freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+
+	/* free space is less than 1kb */
+	if(freeSpace < 1)
+		_Error_Handler(__FILE__, __LINE__);
+
+	/* Writing text */
+	f_puts("STM32 SD Card I/O Example via SPI\n", &fil);
+	f_puts("Save the world!!!", &fil);
+
+	/* Close file */
+	if(f_close(&fil) != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	/* Open file to read */
+	if(f_open(&fil, "first.txt", FA_READ) != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	while(f_gets(buffer, sizeof(buffer), &fil))
+	{
+		/* SWV output */
+		printf("%s", buffer);
+		//fflush(stdout);
+	}
+
+	/* Close file */
+	if(f_close(&fil) != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+
+	/* Unmount SDCARD */
+	if(f_mount(NULL, "", 1) != FR_OK)
+		_Error_Handler(__FILE__, __LINE__);
+}
+#endif
 
 /* USER CODE END 0 */
 
@@ -158,6 +245,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC3_Init();
   MX_CRC_Init();
   MX_DCMI_Init();
@@ -178,13 +266,14 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_HCD_Init();
-  MX_DMA_Init();
   MX_TIM7_Init();
-  MX_SDMMC1_SD_Init();
   MX_FATFS_Init();
+  MX_SPI2_Init();
+  //MX_SDMMC1_SD_Init();
   /* USER CODE BEGIN 2 */
 
-  initiate_runtime();
+  //sdcard_test();
+  initiate_runtime();  
 
   /* USER CODE END 2 */
 
@@ -423,10 +512,10 @@ static void MX_DMA2D_Init(void)
   /* USER CODE END DMA2D_Init 1 */
   hdma2d.Instance = DMA2D;
   hdma2d.Init.Mode = DMA2D_M2M;
-  hdma2d.Init.ColorMode = DMA2D_OUTPUT_RGB565;
+  hdma2d.Init.ColorMode = DMA2D_OUTPUT_ARGB8888;
   hdma2d.Init.OutputOffset = 0;
   hdma2d.LayerCfg[1].InputOffset = 0;
-  hdma2d.LayerCfg[1].InputColorMode = DMA2D_INPUT_RGB565;
+  hdma2d.LayerCfg[1].InputColorMode = DMA2D_INPUT_ARGB8888;
   hdma2d.LayerCfg[1].AlphaMode = DMA2D_NO_MODIF_ALPHA;
   hdma2d.LayerCfg[1].InputAlpha = 0;
   if (HAL_DMA2D_Init(&hdma2d) != HAL_OK)
@@ -775,6 +864,10 @@ static void MX_SDMMC1_SD_Init(void)
   hsd1.Init.BusWide = SDMMC_BUS_WIDE_1B;
   hsd1.Init.HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_DISABLE;
   hsd1.Init.ClockDiv = 0;
+  if (HAL_SD_Init(&hsd1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN SDMMC1_Init 2 */
 
   /* USER CODE END SDMMC1_Init 2 */
@@ -814,6 +907,46 @@ static void MX_SPDIFRX_Init(void)
   /* USER CODE BEGIN SPDIFRX_Init 2 */
 
   /* USER CODE END SPDIFRX_Init 2 */
+
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 7;
+  hspi2.Init.CRCLength = SPI_CRC_LENGTH_DATASIZE;
+  hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
 
 }
 
@@ -1361,9 +1494,6 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOG, ARDUINO_D4_Pin|ARDUINO_D2_Pin|EXT_RST_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_15, GPIO_PIN_RESET);
-
   /*Configure GPIO pin : OTG_HS_OverCurrent_Pin */
   GPIO_InitStruct.Pin = OTG_HS_OverCurrent_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -1452,14 +1582,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ARDUINO_SCK_D13_Pin */
-  GPIO_InitStruct.Pin = ARDUINO_SCK_D13_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
-  HAL_GPIO_Init(ARDUINO_SCK_D13_GPIO_Port, &GPIO_InitStruct);
-
   /*Configure GPIO pin : DCMI_PWR_EN_Pin */
   GPIO_InitStruct.Pin = DCMI_PWR_EN_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -1538,21 +1660,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Alternate = GPIO_AF10_OTG_HS;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : ARDUINO_MISO_D12_Pin */
-  GPIO_InitStruct.Pin = ARDUINO_MISO_D12_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
-  HAL_GPIO_Init(ARDUINO_MISO_D12_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PB15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
 }
 
 /* USER CODE BEGIN 4 */
@@ -1567,11 +1674,10 @@ static void MX_GPIO_Init(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+	/* User can add his own implementation to report the HAL error return state */
+	while(1)
+	{
+	}
   /* USER CODE END Error_Handler_Debug */
 }
 
