@@ -7,11 +7,25 @@
 
 #include "stm32f7xx_hal.h"
 #include "stm32746g_discovery_lcd.h"
+#include "stdlib.h"
+
+//images
+#include "image_ok.h"
+#include "image_error.h"
+#include "image_warning1.h"
+#include "image_techsafe_logo_color.h"
+#include "bmp_parser.h"
+
+//sdcard
+#include "fatfs.h"
 
 extern TIM_HandleTypeDef htim7;
 extern TIM_HandleTypeDef htim1;
 extern UART_HandleTypeDef huart1;
 extern ADC_HandleTypeDef hadc3;
+
+volatile uint8_t SDCard_FatFsCnt = 0;
+volatile uint8_t SDCard_Timer1, SDCard_Timer2;
 
 typedef struct S_Adaptation{
 	TIM_HandleTypeDef* comm_htim;
@@ -169,6 +183,119 @@ void stop_comm_timer(TIM_HandleTypeDef* htim){
 	htim->Instance->CNT = 0; //Reset Counter
 }
 
+
+//sdcard functions
+void SDTimer_Handler(void)
+{
+  if(SDCard_Timer1 > 0)
+	  SDCard_Timer1--;
+
+  if(SDCard_Timer2 > 0)
+	  SDCard_Timer2--;
+}
+
+/*
+ * filename: filename
+ * buf: pointer to the data to be written
+ * btw: number of bytes to write
+ * bw: pointer to the variable to return number of bytes
+ */
+
+void _Error_Handler(char *file, int line)
+{
+	/* USER CODE BEGIN Error_Handler_Debug */
+	/* User can add his own implementation to report the HAL error return state */
+	/* USER CODE END Error_Handler_Debug */
+}
+
+//These should be global for dealing with memory corruption
+FIL fp;
+FATFS fs;
+uint8_t excel_data_counter = 1;
+
+uint8_t SDCard_WriteFile(uint8_t file_id, uint32_t* data, uint32_t datalen, uint32_t* free_space){
+	//FIL fp;
+	FRESULT ret;
+	//FATFS fs;
+	uint32_t totalSpace, freeSpace;
+	DWORD fre_clust;
+	FATFS *pfs;
+	uint32_t bw;
+	uint8_t error;
+
+	char str[10];
+	char col_sep = ',';
+	char row_sep = 0x0A;
+
+	ret = f_mount(&fs, "", 0);
+	if (ret != FR_OK) {
+		_Error_Handler(__FILE__, __LINE__);
+		return 1;
+	}
+	//csv recording???
+	ret = f_open(&fp, "file.csv", FA_OPEN_APPEND | FA_WRITE | FA_READ);
+	if (ret != FR_OK) {
+		_Error_Handler(__FILE__, __LINE__);
+		return 1;
+	}
+
+	/* Check freeSpace space */
+	ret = f_getfree("", &fre_clust, &pfs);
+	if (ret != FR_OK) {
+		_Error_Handler(__FILE__, __LINE__);
+		return 1;
+	}
+
+	totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+	freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+
+	*free_space = freeSpace; //return the free space of the recording medium
+
+	/* free space is less than 1kb */
+	if(freeSpace < 1) return 1;
+
+	for(uint32_t i=0;i<datalen;i++){
+		itoa(data[i], str, 10); //convert data to string
+		if(f_puts(str, &fp) < 0) {
+			error = 1; //there is a write error then break the loop, return error
+			break;
+		}
+
+		if(f_putc(row_sep, &fp) < 0){
+						error = 1; //there is a write error then break the loop, return error
+						break;
+		}
+
+		/*
+		if(excel_data_counter == 10){
+			excel_data_counter = 1;
+			f_putc(row_sep, &fp);//for new row
+		}
+		else{
+			excel_data_counter++;
+			//for new coloumb
+			if(f_putc(col_sep, &fp) < 0){
+				error = 1; //there is a write error then break the loop, return error
+				break;
+			}
+		}*/
+	}
+
+	if(error > 0){
+		return 1;
+	}
+
+	/* Close file */
+	ret = f_close(&fp);
+
+	if (ret != FR_OK) {
+		_Error_Handler(__FILE__, __LINE__);
+		return 1;
+	}
+
+	return 0;
+}
+
 //Callbacks
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -189,6 +316,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 {
 	  if (htim->Instance == TIM6) {
+		  SDCard_FatFsCnt++;
+		  if(SDCard_FatFsCnt >= 10)
+		  {
+			  SDCard_FatFsCnt = 0;
+			  SDTimer_Handler();
+		  }
+
 	    HAL_IncTick();
 	  }
 
@@ -377,6 +511,27 @@ void  Display_Number(int32_t startX, int32_t startY,
 	BSP_LCD_DisplayStringAt(startX, startY, str, LEFT_MODE);
 }
 
+void Display_Image(int32_t startX, int32_t startY,
+											int32_t width, int32_t height,
+												int32_t attr, int32_t val){
+	//define the image table enties
+	uint16_t* image_table[] = {
+			image_ok,
+			image_warning,
+			image_error,
+			image_techsafe_logo
+	};													
+
+	if(val >= sizeof(image_table)) return;
+
+	//First clear the screen part
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_FillRect(startX, startY, width, height);
+
+	//Then draw the bmp to the given coordinates
+	GUI_Disbitmap(startX, startY, width, height, image_table[val]);
+}
+
 #define 	LCD_FOREGROUND_LAYER   0x0001
 #define 	LCD_BACKGROUND_LAYER   0x0000
 #define 	LCD_FRAME_BUFFER   ((uint32_t)0xC0000000)
@@ -384,6 +539,7 @@ void  Display_Number(int32_t startX, int32_t startY,
 void init_lcd_display(){
 	HAL_Delay(1000);
 	BSP_LCD_LayerRgb565Init( LTDC_ACTIVE_LAYER, LCD_FRAME_BUFFER);
+	//BSP_LCD_LayerDefaultInit(LTDC_ACTIVE_LAYER, LCD_FRAME_BUFFER);
 	BSP_LCD_SelectLayer(LTDC_ACTIVE_LAYER);
 	BSP_LCD_Clear(LCD_COLOR_WHITE);
 	BSP_LCD_DisplayOn();
@@ -419,4 +575,5 @@ void initiate_runtime()
 	  initate_analog_channels();
 	  init_lcd_display();
 }
+
 
