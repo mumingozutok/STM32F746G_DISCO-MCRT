@@ -532,6 +532,81 @@ void Display_Image(int32_t startX, int32_t startY,
 	GUI_Disbitmap(startX, startY, width, height, image_table[val]);
 }
 
+void Display_Clear_Area(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
+		BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+		BSP_LCD_FillRect(x, y, w, h);
+}
+
+void Display_AnalogBar_PercText(uint16_t x, uint16_t y, uint8_t val_perc){
+	BSP_LCD_SetFont(&Font16); //width:11, height:16
+
+	Display_Clear_Area(x, y, 44, 16); //%100
+	Display_String(x, y, 11, 16, 0, "%", 1);
+	Display_Number(x+13, y, 33, 16, 0, val_perc);
+}
+
+void Display_AnalogBar_BoundingRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK); //can gather from attr
+	BSP_LCD_DrawRect(x, y, w, h);
+}
+
+void Display_AnalogBar(int32_t startX, int32_t startY,
+											int32_t width, int32_t height,
+												int32_t attr, int32_t val){
+	static uint8_t old_val_perc=0;
+	static uint8_t old_val_perc_div10 = 0;
+
+	//val_max, val_min should come from the upper layers, 0->val_min, 4096->val_max
+	int16_t val_max = 4095, val_min=0;
+
+	//boundary control
+	if(val > val_max) val = val_max;
+	if(val < val_min) val = val_min;
+
+	//calculate val to cell count
+	uint8_t val_perc = (uint8_t)((float)((float)val/(float)(val_max-val_min) * 100.0)); //0-100
+
+	//if change in percentage redraw text area
+	if(val_perc != old_val_perc){
+		old_val_perc = val_perc;
+		Display_AnalogBar_PercText(startX+width+5, startY, val_perc);
+	}
+
+
+	//if change in the graph then draw again
+	if(val_perc / 10 != old_val_perc_div10){
+		old_val_perc_div10 = val_perc/10;
+
+		Display_Clear_Area(startX, startY, width, height);
+		Display_AnalogBar_BoundingRect(startX, startY, width, height);
+
+		width = width - 10; //5 left-right margin
+		height = height -10; //5 top bottom margin
+		startX += 5;
+		startY += 5;
+
+		uint16_t cell_width = width / 10;
+
+		uint8_t bar_count = 0;
+		for(uint8_t i = 0;i<val_perc;i+=10){
+			if(bar_count < 3){
+				BSP_LCD_SetTextColor(LCD_COLOR_RED); //can gather from attr
+			}
+
+			else if(bar_count < 6){
+				BSP_LCD_SetTextColor(LCD_COLOR_YELLOW); //can gather from attr
+			}
+
+			else{
+				BSP_LCD_SetTextColor(LCD_COLOR_GREEN); //can gather from attr
+			}
+
+			BSP_LCD_FillRect(startX+cell_width*bar_count++, startY, cell_width, height);
+		}
+	}
+
+}
+
 #define 	LCD_FOREGROUND_LAYER   0x0001
 #define 	LCD_BACKGROUND_LAYER   0x0000
 #define 	LCD_FRAME_BUFFER   ((uint32_t)0xC0000000)
