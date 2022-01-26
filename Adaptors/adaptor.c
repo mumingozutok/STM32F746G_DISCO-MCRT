@@ -213,6 +213,12 @@ FIL fp;
 FATFS fs;
 uint8_t excel_data_counter = 1;
 
+void init_fatfs(){
+	/* Close file */
+	f_close(&fp);
+	f_mount(0, "", 0);                     /* Unmount the default drive */
+}
+
 uint8_t SDCard_WriteFile(uint8_t file_id, uint32_t* data, uint32_t datalen, uint32_t* free_space){
 	//FIL fp;
 	FRESULT ret;
@@ -257,13 +263,13 @@ uint8_t SDCard_WriteFile(uint8_t file_id, uint32_t* data, uint32_t datalen, uint
 	for(uint32_t i=0;i<datalen;i++){
 		itoa(data[i], str, 10); //convert data to string
 		if(f_puts(str, &fp) < 0) {
-			error = 1; //there is a write error then break the loop, return error
-			break;
+			//error = 1; //there is a write error then break the loop, return error
+			//break;
 		}
 
 		if(f_putc(row_sep, &fp) < 0){
-						error = 1; //there is a write error then break the loop, return error
-						break;
+						//error = 1; //there is a write error then break the loop, return error
+						//break;
 		}
 
 		/*
@@ -287,6 +293,7 @@ uint8_t SDCard_WriteFile(uint8_t file_id, uint32_t* data, uint32_t datalen, uint
 
 	/* Close file */
 	ret = f_close(&fp);
+	ret = f_mount(0, "", 0);                     /* Unmount the default drive */
 
 	if (ret != FR_OK) {
 		_Error_Handler(__FILE__, __LINE__);
@@ -516,10 +523,10 @@ void Display_Image(int32_t startX, int32_t startY,
 												int32_t attr, int32_t val){
 	//define the image table enties
 	uint16_t* image_table[] = {
+			image_techsafe_logo,
 			image_ok,
 			image_warning,
-			image_error,
-			image_techsafe_logo
+			image_error
 	};													
 
 	if(val >= sizeof(image_table)) return;
@@ -532,15 +539,21 @@ void Display_Image(int32_t startX, int32_t startY,
 	GUI_Disbitmap(startX, startY, width, height, image_table[val]);
 }
 
+//-------------------------------Analog Bar-------------------
+uint8_t analogbar_draw_first_call = 1;
+
 void Display_Clear_Area(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
-		BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
 		BSP_LCD_FillRect(x, y, w, h);
 }
 
 void Display_AnalogBar_PercText(uint16_t x, uint16_t y, uint8_t val_perc){
 	BSP_LCD_SetFont(&Font16); //width:11, height:16
 
-	Display_Clear_Area(x, y, 44, 16); //%100
+	//Display_Clear_Area(x, y, 44, 16); //%100
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_FillRect(x, y, 44, 16);
+
 	Display_String(x, y, 11, 16, 0, "%", 1);
 	Display_Number(x+13, y, 33, 16, 0, val_perc);
 }
@@ -566,45 +579,55 @@ void Display_AnalogBar(int32_t startX, int32_t startY,
 	//calculate val to cell count
 	uint8_t val_perc = (uint8_t)((float)((float)val/(float)(val_max-val_min) * 100.0)); //0-100
 
-	//if change in percentage redraw text area
-	if(val_perc != old_val_perc){
-		old_val_perc = val_perc;
-		Display_AnalogBar_PercText(startX+width+5, startY, val_perc);
-	}
-
-
-	//if change in the graph then draw again
-	if(val_perc / 10 != old_val_perc_div10){
-		old_val_perc_div10 = val_perc/10;
-
+	if(analogbar_draw_first_call == 1){
+		analogbar_draw_first_call = 0;
 		Display_Clear_Area(startX, startY, width, height);
 		Display_AnalogBar_BoundingRect(startX, startY, width, height);
-
-		width = width - 10; //5 left-right margin
-		height = height -10; //5 top bottom margin
-		startX += 5;
-		startY += 5;
-
-		uint16_t cell_width = width / 10;
-
-		uint8_t bar_count = 0;
-		for(uint8_t i = 0;i<val_perc;i+=10){
-			if(bar_count < 3){
-				BSP_LCD_SetTextColor(LCD_COLOR_RED); //can gather from attr
-			}
-
-			else if(bar_count < 6){
-				BSP_LCD_SetTextColor(LCD_COLOR_YELLOW); //can gather from attr
-			}
-
-			else{
-				BSP_LCD_SetTextColor(LCD_COLOR_GREEN); //can gather from attr
-			}
-
-			BSP_LCD_FillRect(startX+cell_width*bar_count++, startY, cell_width, height);
-		}
+		Display_AnalogBar_PercText(startX+width+5, startY, 0);
 	}
 
+	else{
+
+		//if change in percentage redraw text area
+		if(val_perc != old_val_perc){
+			old_val_perc = val_perc;
+			Display_AnalogBar_PercText(startX+width+5, startY, val_perc);
+		}
+
+
+		//if change in the graph then draw again
+		if(val_perc / 10 != old_val_perc_div10){
+			old_val_perc_div10 = val_perc/10;
+
+			Display_Clear_Area(startX, startY, width, height);
+			Display_AnalogBar_BoundingRect(startX, startY, width, height);
+
+			width = width - 10; //5 left-right margin
+			height = height -10; //5 top bottom margin
+			startX += 5;
+			startY += 5;
+
+			uint16_t cell_width = width / 10;
+			uint16_t draw_cell_width = cell_width - cell_width / 4;
+
+			uint8_t bar_count = 0;
+			for(uint8_t i = 0;i<val_perc;i+=10){
+				if(bar_count < 3){
+					BSP_LCD_SetTextColor(LCD_COLOR_RED); //can gather from attr
+				}
+
+				else if(bar_count < 6){
+					BSP_LCD_SetTextColor(LCD_COLOR_YELLOW); //can gather from attr
+				}
+
+				else{
+					BSP_LCD_SetTextColor(LCD_COLOR_GREEN); //can gather from attr
+				}
+
+				BSP_LCD_FillRect(startX+cell_width*bar_count++, startY, draw_cell_width, height);
+			}
+		}
+	}
 }
 
 #define 	LCD_FOREGROUND_LAYER   0x0001
@@ -622,6 +645,7 @@ void init_lcd_display(){
 
 void Display_Clear()
 {
+	analogbar_draw_first_call = 1;
 	BSP_LCD_Clear(LCD_COLOR_WHITE);
 }
 
@@ -649,6 +673,7 @@ void initiate_runtime()
 	  initiate_output_channels();
 	  initate_analog_channels();
 	  init_lcd_display();
+	  init_fatfs();
 }
 
 
