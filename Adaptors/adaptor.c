@@ -570,11 +570,15 @@ void Display_AnalogBar(int32_t startX, int32_t startY,
 	static uint8_t old_val_perc_div10 = 0;
 
 	//val_max, val_min should come from the upper layers, 0->val_min, 4096->val_max
-	int16_t val_max = 4095, val_min=0;
+	int16_t val_max = 100, val_min=0;
 
 	//boundary control
 	if(val > val_max) val = val_max;
 	if(val < val_min) val = val_min;
+	if(width < 25) width = 25;
+	if(height < 25) height = 25;
+
+	//uint16_t text_y = (height - 16) / 2 + startY;
 
 	//calculate val to cell count
 	uint8_t val_perc = (uint8_t)((float)((float)val/(float)(val_max-val_min) * 100.0)); //0-100
@@ -583,7 +587,7 @@ void Display_AnalogBar(int32_t startX, int32_t startY,
 		analogbar_draw_first_call = 0;
 		Display_Clear_Area(startX, startY, width, height);
 		Display_AnalogBar_BoundingRect(startX, startY, width, height);
-		Display_AnalogBar_PercText(startX+width+5, startY, 0);
+		//Display_AnalogBar_PercText(startX+width+5, text_y, 0);
 	}
 
 	else{
@@ -591,7 +595,7 @@ void Display_AnalogBar(int32_t startX, int32_t startY,
 		//if change in percentage redraw text area
 		if(val_perc != old_val_perc){
 			old_val_perc = val_perc;
-			Display_AnalogBar_PercText(startX+width+5, startY, val_perc);
+			//Display_AnalogBar_PercText(startX+width+5, text_y, val_perc);
 		}
 
 
