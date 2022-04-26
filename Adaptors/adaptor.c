@@ -16,9 +16,6 @@
 #include "image_techsafe_logo_color.h"
 #include "bmp_parser.h"
 
-//sdcard
-#include "fatfs.h"
-
 extern TIM_HandleTypeDef htim7;
 extern TIM_HandleTypeDef htim1;
 extern UART_HandleTypeDef huart1;
@@ -53,35 +50,53 @@ typedef struct S_Analog_Input_Channel{
 
 static ADC_Info adc_info = {.adc = &hadc3, .ready_flag = 1, .ch_count = 2};
 
-static Digital_Channel inputChannel[3];
+#define DIGITAL_INPUT_CH_COUNT 8
+#define DIGITAL_OUTPUT_CH_COUNT 4
+
+static Digital_Channel inputChannel[8];
 static Digital_Channel outputChannel[4];
 
 #define ANALOG_INPUT_CH_COUNT 2
 static Analog_Input_Channel analog_input_channel[ANALOG_INPUT_CH_COUNT];
 
 void initiate_input_channels(){
-	inputChannel[0].port = GPIOB;
-	inputChannel[0].pin = GPIO_PIN_9; //EXT3
+	inputChannel[0].port = GPIOF;
+	inputChannel[0].pin = GPIO_PIN_9;
 
-	inputChannel[1].port = GPIOB;
-	inputChannel[1].pin = GPIO_PIN_8; //EXT5
+	inputChannel[1].port = GPIOF;
+	inputChannel[1].pin = GPIO_PIN_8;
 
-	inputChannel[2].port = GPIOF; //jOYSTİCK button
-	inputChannel[2].pin = GPIO_PIN_9;
+	inputChannel[2].port = GPIOF;
+	inputChannel[2].pin = GPIO_PIN_7;
+
+	inputChannel[3].port = GPIOF;
+	inputChannel[3].pin = GPIO_PIN_6;
+
+	inputChannel[4].port = GPIOB;
+	inputChannel[4].pin = GPIO_PIN_8;
+
+	inputChannel[5].port = GPIOB;
+	inputChannel[5].pin = GPIO_PIN_9;
+
+	inputChannel[6].port = GPIOH;
+	inputChannel[6].pin = GPIO_PIN_6;
+
+	inputChannel[7].port = GPIOI;
+	inputChannel[7].pin = GPIO_PIN_0;
 }
 
 void initiate_output_channels(){
-	outputChannel[0].port = GPIOI;
-	outputChannel[0].pin = GPIO_PIN_2;
+	outputChannel[0].port = GPIOA;
+	outputChannel[0].pin = GPIO_PIN_8;
 
 	outputChannel[1].port = GPIOA;
 	outputChannel[1].pin = GPIO_PIN_15;
 
-	outputChannel[2].port = GPIOA;
-	outputChannel[2].pin = GPIO_PIN_8;
+	outputChannel[2].port = GPIOI;
+	outputChannel[2].pin = GPIO_PIN_2;
 
-	outputChannel[3].port = GPIOB;
-	outputChannel[3].pin = GPIO_PIN_15;
+	outputChannel[3].port = GPIOG;
+	outputChannel[3].pin = GPIO_PIN_7;
 
 	for(uint8_t i = 0; i<4;i++){
 		hal_gpio_write_pin(i,0);
@@ -105,13 +120,22 @@ uint8_t uart_rx_data;
 //Leds are connected to: PF0-PF2-PF13
 //Please write down GPIO output function in your hardware
 void hal_gpio_write_pin(uint16_t chNum, uint8_t value){
-	HAL_GPIO_WritePin(outputChannel[chNum].port, outputChannel[chNum].pin, value);
+	if(chNum < DIGITAL_OUTPUT_CH_COUNT)
+		HAL_GPIO_WritePin(outputChannel[chNum].port, outputChannel[chNum].pin, value);
 }
 
 uint8_t  hal_gpio_read_pin(uint32_t chNum){
 	//return values >= 2, depicts error
-	return HAL_GPIO_ReadPin(inputChannel[chNum].port, inputChannel[chNum].pin);
+	if(chNum < DIGITAL_INPUT_CH_COUNT)
+		return HAL_GPIO_ReadPin(inputChannel[chNum].port, inputChannel[chNum].pin);
+	return 0;
+}
 
+void reset_all_output_ch(){
+	uint32_t i;
+	for(i = 0; i<DIGITAL_OUTPUT_CH_COUNT; i++){
+		hal_gpio_write_pin(i, 0);
+	}
 }
 
 //------------------ADC readings with DMA---------------------------------------
@@ -208,100 +232,7 @@ void _Error_Handler(char *file, int line)
 	/* USER CODE END Error_Handler_Debug */
 }
 
-//These should be global for dealing with memory corruption
-FIL fp;
-FATFS fs;
-uint8_t excel_data_counter = 1;
 
-void init_fatfs(){
-	/* Close file */
-	f_close(&fp);
-	f_mount(0, "", 0);                     /* Unmount the default drive */
-}
-
-uint8_t SDCard_WriteFile(uint8_t file_id, uint32_t* data, uint32_t datalen, uint32_t* free_space){
-	//FIL fp;
-	FRESULT ret;
-	//FATFS fs;
-	uint32_t totalSpace, freeSpace;
-	DWORD fre_clust;
-	FATFS *pfs;
-	uint32_t bw;
-	uint8_t error;
-
-	char str[10];
-	char col_sep = ',';
-	char row_sep = 0x0A;
-
-	ret = f_mount(&fs, "", 0);
-	if (ret != FR_OK) {
-		_Error_Handler(__FILE__, __LINE__);
-		return 1;
-	}
-	//csv recording???
-	ret = f_open(&fp, "file.csv", FA_OPEN_APPEND | FA_WRITE | FA_READ);
-	if (ret != FR_OK) {
-		_Error_Handler(__FILE__, __LINE__);
-		return 1;
-	}
-
-	/* Check freeSpace space */
-	ret = f_getfree("", &fre_clust, &pfs);
-	if (ret != FR_OK) {
-		_Error_Handler(__FILE__, __LINE__);
-		return 1;
-	}
-
-	totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-	freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
-
-	*free_space = freeSpace; //return the free space of the recording medium
-
-	/* free space is less than 1kb */
-	if(freeSpace < 1) return 1;
-
-	for(uint32_t i=0;i<datalen;i++){
-		itoa(data[i], str, 10); //convert data to string
-		if(f_puts(str, &fp) < 0) {
-			//error = 1; //there is a write error then break the loop, return error
-			//break;
-		}
-
-		if(f_putc(row_sep, &fp) < 0){
-						//error = 1; //there is a write error then break the loop, return error
-						//break;
-		}
-
-		/*
-		if(excel_data_counter == 10){
-			excel_data_counter = 1;
-			f_putc(row_sep, &fp);//for new row
-		}
-		else{
-			excel_data_counter++;
-			//for new coloumb
-			if(f_putc(col_sep, &fp) < 0){
-				error = 1; //there is a write error then break the loop, return error
-				break;
-			}
-		}*/
-	}
-
-	if(error > 0){
-		return 1;
-	}
-
-	/* Close file */
-	ret = f_close(&fp);
-	ret = f_mount(0, "", 0);                     /* Unmount the default drive */
-
-	if (ret != FR_OK) {
-		_Error_Handler(__FILE__, __LINE__);
-		return 1;
-	}
-
-	return 0;
-}
 
 //Callbacks
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
@@ -359,122 +290,6 @@ void get_uniqueid(uint8_t* id, uint16_t len){
 }
 
 
-//---------------------Flash functions---------------------------------------
-#define STM32F467_FLASH_OK
-
-#ifdef STM32F467_FLASH_OK
-
-#define ADDR_FLASH_SECTOR_0 ((uint32_t)0x08000000) // 32 Kbytes
-#define ADDR_FLASH_SECTOR_1 ((uint32_t)0x08008000) // 32 Kbytes
-#define ADDR_FLASH_SECTOR_2 ((uint32_t)0x08010000) // 32 Kbytes
-#define ADDR_FLASH_SECTOR_3 ((uint32_t)0x08018000) // 32 Kbytes
-#define ADDR_FLASH_SECTOR_4 ((uint32_t)0x08020000) // 128 Kbytes
-#define ADDR_FLASH_SECTOR_5 ((uint32_t)0x08040000) // 256 Kbytes
-#define ADDR_FLASH_SECTOR_6 ((uint32_t)0x08080000) // 256 Kbytes
-#define ADDR_FLASH_SECTOR_7 ((uint32_t)0x080C0000) // 256 Kbytes
-
-#define FLASH_MEMORY_SIZE_32K (32*1024)
-#define FLASH_MEMORY_SIZE_128K (128*1024)
-#define FLASH_MEMORY_SIZE_256K (256*1024)
-
-
-#endif
-
-//mem_id: 0 -> Function Blocks
-//mem_id: 1 -> Static Parameters
-//mem_id: 2 -> Dynamic Parameters
-//mem_id: 3 -> Circular FIFO (Data Storage)
-void get_flash_memory_info(uint32_t* start_addr, uint32_t* size, uint8_t mem_id){
-	switch(mem_id){
-	case 0:
-		*start_addr = ADDR_FLASH_SECTOR_7;
-		*size = FLASH_MEMORY_SIZE_128K;
-		break;
-	case 1:
-		*start_addr = ADDR_FLASH_SECTOR_6;
-		*size = FLASH_MEMORY_SIZE_256K;
-		break;
-	case 2:
-		*start_addr = ADDR_FLASH_SECTOR_5;
-		*size = FLASH_MEMORY_SIZE_256K;
-		break;
-	case 3:
-		*start_addr = ADDR_FLASH_SECTOR_4;
-		*size = FLASH_MEMORY_SIZE_256K;
-		break;
-	default:
-		*start_addr = 0;
-		*size = 0;
-	}
-}
-
-uint8_t write_to_flash(uint8_t* p, uint32_t start_addr, uint16_t size)
-{
-	uint8_t ret = 0;
-#ifdef STM32F467_FLASH_OK
-	uint16_t i;
-	uint32_t data;
-
-	HAL_FLASH_Unlock();
-
-	for (i = 0; i < size; i+=4) {
-                data = *(uint32_t*)(p+i);
-		if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, start_addr + i, data) == HAL_OK) ret = 1;
-		else {
-			ret = 0;
-			break;
-		}
-	}
-
-	HAL_FLASH_Lock();
-#endif
-	return 0;
-}
-
-uint8_t erase_flash(uint32_t start_addr, uint8_t mem_id)
-{
-	uint8_t ret = 0;
-#ifdef STM32F467_FLASH_OK
-	uint32_t SectorError = 0;
-    FLASH_EraseInitTypeDef EraseInitStruct;
-
-
-	/* Unlock the Flash to enable the flash control register access *************/
-	HAL_FLASH_Unlock();
-
-	/* Erase the user Flash area
-	(area defined by FLASH_USER_START_ADDR and FLASH_USER_END_ADDR) ***********/
-
-	/* Fill EraseInit structure*/
-	EraseInitStruct.TypeErase = FLASH_TYPEERASE_SECTORS         ;
-	EraseInitStruct.NbSectors = 1;
-	switch (mem_id){
-		case 0:
-			EraseInitStruct.Sector = FLASH_SECTOR_4;
-			break;
-		case 1:
-			EraseInitStruct.Sector = FLASH_SECTOR_5;
-			break;
-		case 2:
-			EraseInitStruct.Sector = FLASH_SECTOR_6;
-			break;
-		case 3:
-			EraseInitStruct.Sector = FLASH_SECTOR_7;
-			break;
-	}
-
-
-	if (HAL_FLASHEx_Erase(&EraseInitStruct, &SectorError) != HAL_OK)
-	{
-		ret = 1;
-	}
-
-	else ret = 0;
-
-#endif
-
-	return ret;
-}
 
 //---------------------Encoder Function---------------------------------------------------
 int8_t hal_get_encoder_value(uint8_t ch)
@@ -518,36 +333,86 @@ void  Display_Number(int32_t startX, int32_t startY,
 	BSP_LCD_DisplayStringAt(startX, startY, str, LEFT_MODE);
 }
 
-void Display_Image(int32_t startX, int32_t startY,
-											int32_t width, int32_t height,
-												int32_t attr, int32_t val){
-	//define the image table enties
-	uint16_t* image_table[] = {
-			image_techsafe_logo,
-			image_ok,
-			image_warning,
-			image_error
-	};													
+typedef struct{
+	uint16_t* data;
+	int32_t width, height;
+}s_image_bmp;
 
-	if(val >= sizeof(image_table)) return;
+void create_image(s_image_bmp* images, uint8_t index, uint32_t* data, uint16_t width, uint16_t height){
+	images[index].data = data;
+	images[index].width = width;
+	images[index].height = height;
+}
+
+void Display_Image(int32_t startX, int32_t startY, int32_t width,
+		int32_t height, int32_t attr, int32_t val) {
+	s_image_bmp images[5];
+	create_image(&images, 0, image_warning, 64, 64);
+	create_image(&images, 1, image_ok, 64, 64);
+	create_image(&images, 2, image_error, 64, 64);
+	create_image(&images, 3, image_techsafe_logo, 181, 64);
+
+	if (val >= 5)
+		return;
 
 	//First clear the screen part
 	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
 	BSP_LCD_FillRect(startX, startY, width, height);
 
 	//Then draw the bmp to the given coordinates
-	GUI_Disbitmap(startX, startY, width, height, image_table[val]);
+	GUI_Disbitmap(startX, startY, images[val].width, images[val].height, images[val].data);
 }
+
+void Display_Animated_Image(int32_t startX, int32_t startY,
+											int32_t width, int32_t height,
+												int32_t attr, int32_t image_index, int32_t image_set_index){
+	//define the image table enties
+	/*
+	uint16_t *image_table[] = { image_techsafe_logo, image_ok, image_warning,
+			image_error, image_hatox_logo };*/
+
+	s_image_bmp* image_set;
+	s_image_bmp image_set0[3];
+
+	create_image(&image_set0, 0, image_warning, 64, 64);
+	create_image(&image_set0, 1, image_ok, 64, 64);
+	create_image(&image_set0, 2, image_error, 64, 64);
+
+	switch(image_set_index){
+	case 0:
+		if(image_index >= 0 & image_index < 3){ //control the boundary of the set
+			image_set = image_set0;
+		}
+		else {
+			image_set = 0;
+		}
+		break;
+	default:
+		image_set = 0;
+		break;
+	}
+
+	//error conditions
+	if(image_set == 0) return;
+
+	//First clear the screen part
+	BSP_LCD_SetTextColor(LCD_COLOR_WHITE);
+	BSP_LCD_FillRect(startX, startY, width, height);
+
+	//Then draw the bmp to the given coordinates
+	GUI_Disbitmap(startX, startY, image_set[image_index].width, image_set[image_index].height, image_set[image_index].data);
+}
+
 
 //-------------------------------Analog Bar-------------------
-uint8_t analogbar_draw_first_call = 1;
+uint8_t analogbar_draw_first_call = 0;
 
-void Display_Clear_Area(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
-		BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
-		BSP_LCD_FillRect(x, y, w, h);
+void Display_Clear_Area(uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+	BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+	BSP_LCD_FillRect(x, y, w, h);
 }
 
-void Display_AnalogBar_PercText(uint16_t x, uint16_t y, uint8_t val_perc){
+void Display_AnalogBar_PercText(uint16_t x, uint16_t y, uint8_t val_perc) {
 	BSP_LCD_SetFont(&Font16); //width:11, height:16
 
 	//Display_Clear_Area(x, y, 44, 16); //%100
@@ -555,82 +420,118 @@ void Display_AnalogBar_PercText(uint16_t x, uint16_t y, uint8_t val_perc){
 	BSP_LCD_FillRect(x, y, 44, 16);
 
 	Display_String(x, y, 11, 16, 0, "%", 1);
-	Display_Number(x+13, y, 33, 16, 0, val_perc);
+	Display_Number(x + 13, y, 33, 16, 0, val_perc);
 }
 
-void Display_AnalogBar_BoundingRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h){
+void Display_AnalogBar_BoundingRect(uint16_t x, uint16_t y, uint16_t w,
+		uint16_t h) {
 	BSP_LCD_SetTextColor(LCD_COLOR_BLACK); //can gather from attr
 	BSP_LCD_DrawRect(x, y, w, h);
 }
 
-void Display_AnalogBar(int32_t startX, int32_t startY,
-											int32_t width, int32_t height,
-												int32_t attr, int32_t val){
-	static uint8_t old_val_perc=0;
-	static uint8_t old_val_perc_div10 = 0;
+typedef struct
+{
+	uint16_t x_out, y_out, w_out, h_out;
+	uint16_t x_inner, y_inner, w_inner, h_inner;
+	uint16_t bar_x_margin;              // a
+	uint16_t bar_width, bar_draw_width; // c
+	uint16_t bar_mid;                   // b
+	uint8_t attr;
+	uint8_t max_levels;
+	uint8_t val;
+} S_Analog_Bar_Graph;
 
-	//val_max, val_min should come from the upper layers, 0->val_min, 4096->val_max
-	int16_t val_max = 100, val_min=0;
+void Draw_AnalogBar(S_Analog_Bar_Graph *abg)
+{
+	uint16_t res;
 
-	//boundary control
-	if(val > val_max) val = val_max;
-	if(val < val_min) val = val_min;
-	if(width < 25) width = 25;
-	if(height < 25) height = 25;
+	// calculate inner margins
+	abg->h_inner = abg->h_out - 10;
+	abg->y_inner = abg->y_out + 5;
+	abg->w_inner = abg->w_out - 10;
+	abg->x_inner = abg->x_out + 5;
 
-	//uint16_t text_y = (height - 16) / 2 + startY;
-
-	//calculate val to cell count
-	uint8_t val_perc = (uint8_t)((float)((float)val/(float)(val_max-val_min) * 100.0)); //0-100
-
-	if(analogbar_draw_first_call == 1){
-		analogbar_draw_first_call = 0;
-		Display_Clear_Area(startX, startY, width, height);
-		Display_AnalogBar_BoundingRect(startX, startY, width, height);
-		//Display_AnalogBar_PercText(startX+width+5, text_y, 0);
+	if(abg->attr == 0){ //horizontal
+		abg->bar_width = abg->w_inner / abg->max_levels;
+		//artık kalanı hesapla,
+		res = abg->w_inner - (abg->bar_width * abg->max_levels);
+		//  x marjini buna göre değiştir.
+		abg->x_inner += res / 2;
 	}
 
-	else{
+	else{ //vertical
+		abg->bar_width = abg->h_inner / abg->max_levels;
+		//artık kalanı hesapla,
+		res = abg->h_inner - (abg->bar_width * abg->max_levels);
+		//  y marjini buna göre değiştir.
+		abg->y_inner += res / 2;
+	}
 
-		//if change in percentage redraw text area
-		if(val_perc != old_val_perc){
-			old_val_perc = val_perc;
-			//Display_AnalogBar_PercText(startX+width+5, text_y, val_perc);
+	abg->bar_draw_width = abg->bar_width - abg->bar_width / 4;
+
+	Display_Clear_Area(abg->x_out, abg->y_out, abg->w_out, abg->h_out);
+	Display_AnalogBar_BoundingRect(abg->x_out, abg->y_out, abg->w_out, abg->h_out);
+
+
+	uint8_t bar_count = 0;
+	for (uint8_t i = 0; i < abg->val; i++)
+	{
+		if (bar_count < 3)
+		{
+			BSP_LCD_SetTextColor(LCD_COLOR_RED); // can gather from attr
 		}
 
-
-		//if change in the graph then draw again
-		if(val_perc / 10 != old_val_perc_div10){
-			old_val_perc_div10 = val_perc/10;
-
-			Display_Clear_Area(startX, startY, width, height);
-			Display_AnalogBar_BoundingRect(startX, startY, width, height);
-
-			width = width - 10; //5 left-right margin
-			height = height -10; //5 top bottom margin
-			startX += 5;
-			startY += 5;
-
-			uint16_t cell_width = width / 10;
-			uint16_t draw_cell_width = cell_width - cell_width / 4;
-
-			uint8_t bar_count = 0;
-			for(uint8_t i = 0;i<val_perc;i+=10){
-				if(bar_count < 3){
-					BSP_LCD_SetTextColor(LCD_COLOR_RED); //can gather from attr
-				}
-
-				else if(bar_count < 6){
-					BSP_LCD_SetTextColor(LCD_COLOR_YELLOW); //can gather from attr
-				}
-
-				else{
-					BSP_LCD_SetTextColor(LCD_COLOR_GREEN); //can gather from attr
-				}
-
-				BSP_LCD_FillRect(startX+cell_width*bar_count++, startY, draw_cell_width, height);
-			}
+		else if (bar_count < 6)
+		{
+			BSP_LCD_SetTextColor(LCD_COLOR_YELLOW); // can gather from attr
 		}
+
+		else
+		{
+			BSP_LCD_SetTextColor(LCD_COLOR_GREEN); // can gather from attr
+		}
+
+		if(abg->attr == 0){ //horizontal
+			BSP_LCD_FillRect(abg->x_inner + abg->bar_width * bar_count++, abg->y_inner, abg->bar_draw_width, abg->h_inner);
+		}
+
+		else{//vertical
+			BSP_LCD_FillRect(abg->x_inner , abg->y_inner+ abg->bar_width * ((abg->max_levels-1)-bar_count++), abg->w_inner, abg->bar_draw_width);
+		}
+
+	}
+}
+
+void Display_AnalogBar(int32_t startX, int32_t startY, int32_t width,
+		int32_t height, int32_t attr, int32_t val, int32_t max_levels)
+{
+	S_Analog_Bar_Graph abg = {.x_out = startX, .y_out = startY, .w_out = width, .h_out = height, .attr = attr, .val = val, .max_levels = max_levels};
+
+	// val_max, val_min should come from the upper layers, 0->val_min, 4096->val_max
+	int16_t val_max = 100, val_min = 0;
+
+	// boundary control
+	if (val > val_max)
+		abg.val = val_max;
+	if (val < val_min)
+		abg.val = val_min;
+	if (width < 25)
+		abg.w_out = 25;
+	if (height < 25)
+		abg.h_out = 25;
+
+	switch (analogbar_draw_first_call)
+	{
+	case 0: // first-draw init
+		Display_Clear_Area(abg.x_out, abg.y_out, abg.w_out, abg.h_out);
+		Display_AnalogBar_BoundingRect(abg.x_out, abg.y_out, abg.w_out, abg.h_out);
+		Draw_AnalogBar(&abg);
+		analogbar_draw_first_call = 1;
+		break;
+
+	case 1:
+		Draw_AnalogBar(&abg);
+		break;
 	}
 }
 
@@ -653,8 +554,6 @@ void Display_Clear()
 	BSP_LCD_Clear(LCD_COLOR_WHITE);
 }
 
-
-
 //Watch function
 void hal_xfer_watch_data(uint8_t len, uint8_t* watch_data){
 	hal_modbus_uart_tx(watch_data, len);
@@ -669,6 +568,12 @@ void hal_enable_interrupts(){
 	__enable_irq();
 }
 
+//initialization and resets
+void ecu_deployment_reset(){
+	reset_all_output_ch();
+	Display_Clear();
+}
+
 void initiate_runtime()
 {
 	  init_comm_data_service();
@@ -678,6 +583,7 @@ void initiate_runtime()
 	  initate_analog_channels();
 	  init_lcd_display();
 	  init_fatfs();
+	  ecu_deployment_reset();
 }
 
 

@@ -75,7 +75,6 @@ TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim8;
-TIM_HandleTypeDef htim12;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart6;
@@ -108,7 +107,6 @@ static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM8_Init(void);
-static void MX_TIM12_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_USB_OTG_FS_HCD_Init(void);
@@ -123,88 +121,6 @@ static void MX_SDMMC1_SD_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-
-#ifdef ZAFER
-
-FATFS fs;
-FATFS *pfs;
-FIL fil;
-FRESULT fres;
-DWORD fre_clust;
-uint32_t totalSpace, freeSpace;
-char buffer[100];
-
-/**
- * @brief  This function is executed in case of error occurrence.
- * @param  file: The file name as string.
- * @param  line: The line in file as a number.
- * @retval None
- */
-void _Error_Handler(char *file, int line)
-{
-	/* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
-	while(1)
-	{
-	}
-	/* USER CODE END Error_Handler_Debug */
-}
-
-void sdcard_test(){
-	FRESULT ret;
-
-	/* Wait for SD module reset */
-	HAL_Delay(500);
-
-	/* Mount SD Card */
-	ret = f_mount(&fs, "", 0);
-	if(ret != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	/* Open file to write */
-	ret = f_open(&fil, "first.txt", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
-	if(ret != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	/* Check freeSpace space */
-	if(f_getfree("", &fre_clust, &pfs) != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-	freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
-
-	/* free space is less than 1kb */
-	if(freeSpace < 1)
-		_Error_Handler(__FILE__, __LINE__);
-
-	/* Writing text */
-	f_puts("STM32 SD Card I/O Example via SPI\n", &fil);
-	f_puts("Save the world!!!", &fil);
-
-	/* Close file */
-	if(f_close(&fil) != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	/* Open file to read */
-	if(f_open(&fil, "first.txt", FA_READ) != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	while(f_gets(buffer, sizeof(buffer), &fil))
-	{
-		/* SWV output */
-		printf("%s", buffer);
-		//fflush(stdout);
-	}
-
-	/* Close file */
-	if(f_close(&fil) != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-
-	/* Unmount SDCARD */
-	if(f_mount(NULL, "", 1) != FR_OK)
-		_Error_Handler(__FILE__, __LINE__);
-}
-#endif
 
 /* USER CODE END 0 */
 
@@ -262,7 +178,6 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM5_Init();
   MX_TIM8_Init();
-  MX_TIM12_Init();
   MX_USART1_UART_Init();
   MX_USART6_UART_Init();
   MX_USB_OTG_FS_HCD_Init();
@@ -1115,7 +1030,6 @@ static void MX_TIM5_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM5_Init 1 */
 
@@ -1135,28 +1049,15 @@ static void MX_TIM5_Init(void)
   {
     Error_Handler();
   }
-  if (HAL_TIM_PWM_Init(&htim5) != HAL_OK)
-  {
-    Error_Handler();
-  }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim5, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
-  {
-    Error_Handler();
-  }
   /* USER CODE BEGIN TIM5_Init 2 */
 
   /* USER CODE END TIM5_Init 2 */
-  HAL_TIM_MspPostInit(&htim5);
 
 }
 
@@ -1242,48 +1143,6 @@ static void MX_TIM8_Init(void)
   /* USER CODE BEGIN TIM8_Init 2 */
 
   /* USER CODE END TIM8_Init 2 */
-
-}
-
-/**
-  * @brief TIM12 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM12_Init(void)
-{
-
-  /* USER CODE BEGIN TIM12_Init 0 */
-
-  /* USER CODE END TIM12_Init 0 */
-
-  TIM_OC_InitTypeDef sConfigOC = {0};
-
-  /* USER CODE BEGIN TIM12_Init 1 */
-
-  /* USER CODE END TIM12_Init 1 */
-  htim12.Instance = TIM12;
-  htim12.Init.Prescaler = 0;
-  htim12.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim12.Init.Period = 65535;
-  htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_PWM_Init(&htim12) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  if (HAL_TIM_PWM_ConfigChannel(&htim12, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM12_Init 2 */
-
-  /* USER CODE END TIM12_Init 2 */
-  HAL_TIM_MspPostInit(&htim12);
 
 }
 
@@ -1576,8 +1435,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : TP3_Pin NC2_Pin */
-  GPIO_InitStruct.Pin = TP3_Pin|NC2_Pin;
+  /*Configure GPIO pins : TP3_Pin NC2_Pin PH6 */
+  GPIO_InitStruct.Pin = TP3_Pin|NC2_Pin|GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOH, &GPIO_InitStruct);
@@ -1588,6 +1447,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(DCMI_PWR_EN_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PI0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOI, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LCD_INT_Pin */
   GPIO_InitStruct.Pin = LCD_INT_Pin;
@@ -1609,6 +1474,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PF7 PF6 PF8 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_6|GPIO_PIN_8;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PF9 */
   GPIO_InitStruct.Pin = GPIO_PIN_9;
@@ -1666,6 +1537,28 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE END 4 */
 
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM6 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+#if 0
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM6) {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
+#endif
 
 /**
   * @brief  This function is executed in case of error occurrence.
